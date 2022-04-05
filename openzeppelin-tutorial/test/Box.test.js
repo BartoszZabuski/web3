@@ -1,23 +1,84 @@
+// test/Box.test.js
+// Load dependencies
 const { expect } = require('chai');
 
-describe('Box contract tests', () => {
+// Import utilities from Test Helpers
+const { BN, expectEvent, expectRevert } = require('@openzeppelin/test-helpers');
+const { web3 } = require('@openzeppelin/test-helpers/src/setup');
 
-	let Box;
-	let box;
-	
+// Load compiled artifacts
+const Box = artifacts.require('Box');
+
+// Start test block
+contract('Box (truffle)', function ([ owner, other ]) {
+  // Use large integers ('big numbers')
+  const value = new BN('42');
+
+  beforeEach(async function () {
+    this.box = await Box.new({ from: owner });
+  });
+
+  it('retrieve returns a value previously stored', async function () {
+    await this.box.store(value, { from: owner });
+
+    // Use large integer comparisons
+    expect(await this.box.retrieve()).to.be.bignumber.equal(value);
+  });
+
+  it('store emits an event', async function () {
+    const receipt = await this.box.store(value, { from: owner });
+
+    // Test that a ValueChanged event was emitted with the new value
+    expectEvent(receipt, 'ValueChanged', { value: value });
+  });
+
+  it('non owner cannot store a value', async function () {
+    // Test a transaction reverts
+    await expectRevert(
+      this.box.store(value, { from: other }),
+      'Ownable: caller is not the owner',
+    );
+  });
+});
+
+// Start test block
+describe('Box (Mocha)', function () {
+	// Use large integers ('big numbers')
+	const value = new BN('42');
+	let owner;
+	let other;
+
 	before(async () => {
-		Box = await ethers.getContractFactory('Box');
-	})
+		accounts = await web3.eth.getAccounts();
 
-	beforeEach(async () => {
-		box = await Box.deploy();
-		await box.deployed();
+		owner = accounts[0];
+		other = accounts[1];
 	})
-
-	it('retrieve returns a value previously stored', async () => {
-		await box.store(42);
-		
-		expect((await box.retrieve()).toString()).to.equal('42');
-	  });
-	
-})
+  
+	beforeEach(async function () {
+	  this.box = await Box.new({ from: owner });
+	});
+  
+	it('retrieve returns a value previously stored', async function () {
+	  await this.box.store(value, { from: owner });
+  
+	  // Use large integer comparisons
+	  expect(await this.box.retrieve()).to.be.bignumber.equal(value);
+	});
+  
+	it('store emits an event', async function () {
+	  const receipt = await this.box.store(value, { from: owner });
+  
+	  // Test that a ValueChanged event was emitted with the new value
+	  expectEvent(receipt, 'ValueChanged', { value: value });
+	});
+  
+	it('non owner cannot store a value', async function () {
+	  // Test a transaction reverts
+	  await expectRevert(
+		this.box.store(value, { from: other }),
+		'Ownable: caller is not the owner',
+	  );
+	});
+  });
+  
