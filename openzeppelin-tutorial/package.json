@@ -20,7 +20,9 @@
   "scripts": {
     "compile": "npx hardhat compile",
     "network:local:start": "npx hardhat node",
-    "test:unit": "npx hardhat test"
+    "test:unit": "npx hardhat test",
+    "generate:secret:words": "npx mnemonics",
+    "deploy:rinkeby": "npx hardhat run --network rinkeby scripts/deploy.js"
   },
   "author": "",
   "license": "ISC"
