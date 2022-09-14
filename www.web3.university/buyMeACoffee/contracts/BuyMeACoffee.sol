@@ -27,12 +27,11 @@ contract BuyMeACoffee {
     Memo[] memos;
 
     // Address of contract deployer. This is where we will be withdrawing the money to.
-     address payable owner; 
+     address payable public owner; 
 
 
     // Deploy logic!
     constructor() {
-        // CHECK: payable
         owner = payable(msg.sender);
     }
 
