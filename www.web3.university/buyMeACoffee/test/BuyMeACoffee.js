@@ -1,163 +1,128 @@
-const {
-  time,
-  loadFixture,
-} = require("@nomicfoundation/hardhat-network-helpers");
-const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
 const { expect } = require("chai");
+const Web3 = require("web3");
+const waitForExpect = require("wait-for-expect");
 
 describe("BuyMeACoffee", function () {
-  // We define a fixture to reuse the same setup in every test.
-  // We use loadFixture to run this setup once, snapshot that state,
-  // and reset Hardhat Network to that snapshot in every test.
-  // async function deployOneYearLockFixture() {
-  //   const ONE_YEAR_IN_SECS = 365 * 24 * 60 * 60;
-  //   const ONE_GWEI = 1_000_000_000;
-
-  //   const lockedAmount = ONE_GWEI;
-  //   const unlockTime = (await time.latest()) + ONE_YEAR_IN_SECS;
-
-  //   // Contracts are deployed using the first signer/account by default
-  //   const [owner, otherAccount] = await ethers.getSigners();
-
-  //   const Lock = await ethers.getContractFactory("Lock");
-  //   const lock = await Lock.deploy(unlockTime, { value: lockedAmount });
-
-  //   return { lock, unlockTime, lockedAmount, owner, otherAccount };
-  // }
-
   describe("Deployment", function () {
-
     it("Deployment should assign deploying address as a contract owner", async function () {
       const [owner] = await ethers.getSigners();
-  
+
       const BuyMeACoffee = await ethers.getContractFactory("BuyMeACoffee");
-  
+
       const buyMeACoffee = await BuyMeACoffee.deploy();
-  
+
       expect(await buyMeACoffee.owner()).to.equal(await owner.getAddress());
     });
-
-    // it("Should set the right owner", async function () {
-    //   const { lock, owner } = await loadFixture(deployOneYearLockFixture);
-
-    //   expect(await lock.owner()).to.equal(owner.address);
-    // });
-
-    // it("Should receive and store the funds to lock", async function () {
-    //   const { lock, lockedAmount } = await loadFixture(
-    //     deployOneYearLockFixture
-    //   );
-
-    //   expect(await ethers.provider.getBalance(lock.address)).to.equal(
-    //     lockedAmount
-    //   );
-    // });
-
-    // it("Should fail if the unlockTime is not in the future", async function () {
-    //   // We don't use the fixture here because we want a different deployment
-    //   const latestTime = await time.latest();
-    //   const Lock = await ethers.getContractFactory("Lock");
-    //   await expect(Lock.deploy(latestTime, { value: 1 })).to.be.revertedWith(
-    //     "Unlock time should be in the future"
-    //   );
-    // });
   });
 
   describe("buyACoffee", function () {
+    it("Should fail if tipper sends 0 eth", async function () {
+      const [owner, tipper1] = await ethers.getSigners();
 
-      it("Should send money to owner address", async function () {
-        const [owner, tipper1] = await ethers.getSigners();
+      const BuyMeACoffee = await ethers.getContractFactory("BuyMeACoffee");
 
-        const BuyMeACoffee = await ethers.getContractFactory("BuyMeACoffee");
-  
-        const buyMeACoffee = await BuyMeACoffee.deploy();
+      const buyMeACoffee = await BuyMeACoffee.deploy();
 
-        const beforeContractBalance = await ethers.provider.getBalance(buyMeACoffee.address);
-        const beforeOwnerBalance = await ethers.provider.getBalance(owner.address);
-        const beforeTipper1Balance = await ethers.provider.getBalance(tipper1.address);
+      await expect(
+        buyMeACoffee.connect(tipper1).buyACoffee("tom", "message 1", {
+          value: ethers.utils.parseEther("0"),
+        })
+      ).to.be.revertedWith("Can't buy coffee with 0 ETH");
+    });
 
-        console.log('beforeContractBalance', beforeContractBalance);
-        console.log('beforeOwnerBalance', beforeOwnerBalance);
-        console.log('beforeTipper1Balance', beforeTipper1Balance);
-    
-        await expect(buyMeACoffee.connect(tipper1).buyACoffee('tom', 'message 1', { value: ethers.utils.parseEther("0.001") }));
-        await expect(buyMeACoffee.connect(tipper1).buyACoffee('tom', 'message 1', { value: ethers.utils.parseEther("0.001") }));
-        await expect(buyMeACoffee.connect(tipper1).buyACoffee('tom', 'message 1', { value: ethers.utils.parseEther("0.001") }));
+    it("Tips are stored in contract balance", async function () {
+      const [owner, tipper1] = await ethers.getSigners();
 
-        const afterContractBalance = await ethers.provider.getBalance(buyMeACoffee.address);
-        const afterOwnerBalance = await ethers.provider.getBalance(owner.address);
-        const afterTipper1Balance = await ethers.provider.getBalance(tipper1.address);
+      const BuyMeACoffee = await ethers.getContractFactory("BuyMeACoffee");
 
-        console.log('afterContractBalance', afterContractBalance);
-        console.log('afterOwnerBalance', afterOwnerBalance);
-        console.log('afterTipper1Balance', afterTipper1Balance);
+      const buyMeACoffee = await BuyMeACoffee.deploy();
 
+      const beforeTipper1Balance = await ethers.provider.getBalance(
+        tipper1.address
+      );
+
+      await expect(await buyMeACoffee.balanceOf()).eq(0);
+
+      const numberOfTips = 10;
+
+      for (let index = 0; index < numberOfTips; index++) {
+        await expect(
+          buyMeACoffee.connect(tipper1).buyACoffee("tom", "message 1", {
+            value: ethers.utils.parseEther("1.000"),
+          })
+        );
+      }
+
+      await waitForExpect(async () => {
+        const afterTipper1Balance = await ethers.provider.getBalance(
+          tipper1.address
+        );
+
+        const tipperBalanceDiff = beforeTipper1Balance - afterTipper1Balance;
+        const tipperBalanceDiffEth = Web3.utils.fromWei(
+          `${tipperBalanceDiff}`,
+          "ether"
+        );
+        const contractBalanceEth = Web3.utils.fromWei(
+          `${await buyMeACoffee.balanceOf()}`,
+          "ether"
+        );
+
+        // tipper1 balance difference after tipping
+        await expect(Math.floor(tipperBalanceDiffEth)).eq(numberOfTips);
+        // contract balance after tipping
+        await expect(Math.floor(contractBalanceEth)).eq(numberOfTips);
       });
+    });
+
+    it("Action of tipping should emit a memo", async function () {
+      const [owner, tipper1] = await ethers.getSigners();
+
+      const BuyMeACoffee = await ethers.getContractFactory("BuyMeACoffee");
+
+      const buyMeACoffee = await BuyMeACoffee.deploy();
+
+      const name = "tom";
+      const msg = "message 1";
+      await expect(
+        buyMeACoffee
+          .connect(tipper1)
+          .buyACoffee(name, msg, { value: ethers.utils.parseEther("1.000") })
+      )
+        .to.emit(buyMeACoffee, "NewMemo")
+        // hack for omitting block.timestamp for time being
+        .withArgs(tipper1.address, [], name, msg);
+    });
   });
 
-  // describe("Withdrawals", function () {
-  // //   describe("Validations", function () {
-  // //     it("Should revert with the right error if called too soon", async function () {
-  // //       const { lock } = await loadFixture(deployOneYearLockFixture);
+  describe("getMemos", () => {
+    it("should return all memos", async function () {
+      const [owner, tipper1] = await ethers.getSigners();
 
-  // //       await expect(lock.withdraw()).to.be.revertedWith(
-  // //         "You can't withdraw yet"
-  // //       );
-  // //     });
+      const BuyMeACoffee = await ethers.getContractFactory("BuyMeACoffee");
 
-  // //     it("Should revert with the right error if called from another account", async function () {
-  // //       const { lock, unlockTime, otherAccount } = await loadFixture(
-  // //         deployOneYearLockFixture
-  // //       );
+      const buyMeACoffee = await BuyMeACoffee.deploy();
 
-  // //       // We can increase the time in Hardhat Network
-  // //       await time.increaseTo(unlockTime);
+      const name = "tom";
+      const msg = "message 1";
+      await buyMeACoffee
+        .connect(tipper1)
+        .buyACoffee(name, msg, { value: ethers.utils.parseEther("1.000") });
 
-  // //       // We use lock.connect() to send a transaction from another account
-  // //       await expect(lock.connect(otherAccount).withdraw()).to.be.revertedWith(
-  // //         "You aren't the owner"
-  // //       );
-  // //     });
+      const name2 = "tom";
+      const msg2 = "message 1";
+      await buyMeACoffee
+        .connect(tipper1)
+        .buyACoffee(name2, msg2, { value: ethers.utils.parseEther("1.000") });
 
-  // //     it("Shouldn't fail if the unlockTime has arrived and the owner calls it", async function () {
-  // //       const { lock, unlockTime } = await loadFixture(
-  // //         deployOneYearLockFixture
-  // //       );
-
-  // //       // Transactions are sent using the first signer by default
-  // //       await time.increaseTo(unlockTime);
-
-  // //       await expect(lock.withdraw()).not.to.be.reverted;
-  // //     });
-  // //   });
-
-  // //   describe("Events", function () {
-  // //     it("Should emit an event on withdrawals", async function () {
-  // //       const { lock, unlockTime, lockedAmount } = await loadFixture(
-  // //         deployOneYearLockFixture
-  // //       );
-
-  // //       await time.increaseTo(unlockTime);
-
-  // //       await expect(lock.withdraw())
-  // //         .to.emit(lock, "Withdrawal")
-  // //         .withArgs(lockedAmount, anyValue); // We accept any value as `when` arg
-  // //     });
-  //   });
-
-  //   describe("Transfers", function () {
-  //     it("Should transfer the funds to the owner", async function () {
-  //       const { lock, unlockTime, lockedAmount, owner } = await loadFixture(
-  //         deployOneYearLockFixture
-  //       );
-
-  //       await time.increaseTo(unlockTime);
-
-  //       await expect(lock.withdraw()).to.changeEtherBalances(
-  //         [owner, lock],
-  //         [lockedAmount, -lockedAmount]
-  //       );
-  //     });
-  //   });
-  // });
+      const memos = await buyMeACoffee.getMemos();
+      expect(memos).length(2);
+      expect(memos[0][0]).eq(tipper1.address);
+      expect(memos[0][2]).eq(name);
+      expect(memos[0][3]).eq(msg);
+      expect(memos[1][0]).eq(tipper1.address);
+      expect(memos[1][2]).eq(name2);
+      expect(memos[1][3]).eq(msg2);
+    });
+  });
 });

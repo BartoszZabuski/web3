@@ -65,4 +65,11 @@ contract BuyMeACoffee {
     function getMemos() public view returns(Memo[] memory) {
         return memos;
     }
+    
+    /**
+     *  @dev balanceOf contract
+     */
+    function balanceOf() public view returns(uint256 balance){
+        return address(this).balance;
+    }
 }
