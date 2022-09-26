@@ -19,16 +19,23 @@ const printBalance = async (name, address, inEth = true) => {
     
 }
 
+const contractSetup = async () => {
+  // A Signer in ethers.js is an object that represents an Ethereum account. 
+  // It's used to send transactions to contracts and other accounts.
+  const [owner, tipper1, tipper2, newWithdrawalAddress] = await ethers.getSigners();
+
+  const BuyMeACoffee = await ethers.getContractFactory("BuyMeACoffee");
+
+  const buyMeACoffee = await BuyMeACoffee.deploy();
+
+  return { BuyMeACoffee, buyMeACoffee, owner, tipper1, tipper2, newWithdrawalAddress };
+}
+
 describe("BuyMeACoffee", function () {
+
   describe("Deployment", function () {
     it("Deployment should assign deploying address as a contract owner", async function () {
-      // A Signer in ethers.js is an object that represents an Ethereum account. 
-      // It's used to send transactions to contracts and other accounts.
-      const [owner] = await ethers.getSigners();
-
-      const BuyMeACoffee = await ethers.getContractFactory("BuyMeACoffee");
-
-      const buyMeACoffee = await BuyMeACoffee.deploy();
+      const { buyMeACoffee, owner } = await contractSetup();
 
       expect(await buyMeACoffee.owner()).to.equal(await owner.getAddress());
     });
@@ -36,11 +43,7 @@ describe("BuyMeACoffee", function () {
 
   describe("buyACoffee", function () {
     it("Should fail if tipper sends 0 eth", async function () {
-      const [owner, tipper1] = await ethers.getSigners();
-
-      const BuyMeACoffee = await ethers.getContractFactory("BuyMeACoffee");
-
-      const buyMeACoffee = await BuyMeACoffee.deploy();
+      const { buyMeACoffee, tipper1 } = await contractSetup();
 
       await expect(
         buyMeACoffee.connect(tipper1).buyACoffee("tom", "message 1", {
@@ -50,11 +53,7 @@ describe("BuyMeACoffee", function () {
     });
 
     it("Tips are stored in contract balance", async function () {
-      const [owner, tipper1] = await ethers.getSigners();
-
-      const BuyMeACoffee = await ethers.getContractFactory("BuyMeACoffee");
-
-      const buyMeACoffee = await BuyMeACoffee.deploy();
+      const { buyMeACoffee, tipper1 } = await contractSetup();
 
       const beforeTipper1Balance = await ethers.provider.getBalance(
         tipper1.address
@@ -95,11 +94,7 @@ describe("BuyMeACoffee", function () {
     });
 
     it("Action of tipping should emit a memo", async function () {
-      const [owner, tipper1] = await ethers.getSigners();
-
-      const BuyMeACoffee = await ethers.getContractFactory("BuyMeACoffee");
-
-      const buyMeACoffee = await BuyMeACoffee.deploy();
+      const { buyMeACoffee, tipper1 } = await contractSetup();
 
       const name = "tom";
       const msg = "message 1";
@@ -116,11 +111,7 @@ describe("BuyMeACoffee", function () {
 
   describe("getMemos", () => {
     it("should return all memos", async function () {
-      const [owner, tipper1] = await ethers.getSigners();
-
-      const BuyMeACoffee = await ethers.getContractFactory("BuyMeACoffee");
-
-      const buyMeACoffee = await BuyMeACoffee.deploy();
+      const { buyMeACoffee, tipper1, tipper2 } = await contractSetup();
 
       const name = "tom";
       const msg = "message 1";
@@ -131,7 +122,7 @@ describe("BuyMeACoffee", function () {
       const name2 = "tom";
       const msg2 = "message 1";
       await buyMeACoffee
-        .connect(tipper1)
+        .connect(tipper2)
         .buyACoffee(name2, msg2, { value: ethers.utils.parseEther("1.000") });
 
       const memos = await buyMeACoffee.getMemos();
@@ -139,7 +130,7 @@ describe("BuyMeACoffee", function () {
       expect(memos[0][0]).eq(tipper1.address);
       expect(memos[0][2]).eq(name);
       expect(memos[0][3]).eq(msg);
-      expect(memos[1][0]).eq(tipper1.address);
+      expect(memos[1][0]).eq(tipper2.address);
       expect(memos[1][2]).eq(name2);
       expect(memos[1][3]).eq(msg2);
     });
@@ -148,11 +139,7 @@ describe("BuyMeACoffee", function () {
   describe("updateWithdrawalAddress", () => {
     
     it("only owner can change withdrawal address", async function () {
-      const [owner, tipper1, tipper2] = await ethers.getSigners();
-
-      const BuyMeACoffee = await ethers.getContractFactory("BuyMeACoffee");
-
-      const buyMeACoffee = await BuyMeACoffee.deploy();
+      const { buyMeACoffee, tipper1 } = await contractSetup();
 
       await expect(
         buyMeACoffee
@@ -162,11 +149,7 @@ describe("BuyMeACoffee", function () {
     });
 
     it("intially owner's address is set for withdrawal address", async function () {
-      const [owner, tipper1] = await ethers.getSigners();
-
-      const BuyMeACoffee = await ethers.getContractFactory("BuyMeACoffee");
-
-      const buyMeACoffee = await BuyMeACoffee.deploy();
+      const { buyMeACoffee, owner, tipper1 } = await contractSetup();
 
       const name = "tom";
       const msg = "message 1";
@@ -221,11 +204,7 @@ describe("BuyMeACoffee", function () {
     });
 
     it("withdrawal address can be updated", async function () {
-      const [owner, tipper1, newWithdrawalAddress] = await ethers.getSigners();
-
-      const BuyMeACoffee = await ethers.getContractFactory("BuyMeACoffee");
-
-      const buyMeACoffee = await BuyMeACoffee.deploy();
+      const { buyMeACoffee, owner, tipper1, newWithdrawalAddress } = await contractSetup();
 
       await printBalance('owner', owner.address);
       await printBalance('tipper1', tipper1.address);
