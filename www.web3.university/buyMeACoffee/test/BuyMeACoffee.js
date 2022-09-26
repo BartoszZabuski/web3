@@ -66,7 +66,7 @@ describe("BuyMeACoffee", function () {
       for (let index = 0; index < numberOfTips; index++) {
         await expect(
           buyMeACoffee.connect(tipper1).buyACoffee("tom", "message 1", {
-            value: ethers.utils.parseEther("1.000"),
+            value: ethers.utils.parseEther("10.000"),
           })
         );
       }
@@ -87,9 +87,9 @@ describe("BuyMeACoffee", function () {
         );
 
         // tipper1 balance difference after tipping
-        await expect(Math.floor(tipperBalanceDiffEth)).eq(numberOfTips);
+        await expect(Math.floor(tipperBalanceDiffEth)).eq(numberOfTips * 10);
         // contract balance after tipping
-        await expect(Math.floor(contractBalanceEth)).eq(numberOfTips);
+        await expect(Math.floor(contractBalanceEth)).eq(numberOfTips * 10);
       });
     });
 

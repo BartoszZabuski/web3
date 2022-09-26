@@ -61,8 +61,6 @@ contract BuyMeACoffee {
      *  @param _name name of the coffee buyer
      *  @param _message a nice message from the coffee buyer
      */
-    // CHECK: memory keyword
-    // CHECK: payable keyword
     function buyACoffee(string memory _name, string memory _message) public payable {
         require(msg.value > 0, "Can't buy coffee with 0 ETH");
 
