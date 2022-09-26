@@ -2,9 +2,28 @@ const { expect } = require("chai");
 const Web3 = require("web3");
 const waitForExpect = require("wait-for-expect");
 
+const printBalance = async (name, address, inEth = true) => {
+  let value = await ethers.provider.getBalance(
+    address
+  );
+
+  if(inEth){
+    value = Web3.utils.fromWei(
+      `${value}`,
+      "ether"
+    );
+
+  }
+  
+  console.log(`${name}: ${address} balance: ${value}`);
+    
+}
+
 describe("BuyMeACoffee", function () {
   describe("Deployment", function () {
     it("Deployment should assign deploying address as a contract owner", async function () {
+      // A Signer in ethers.js is an object that represents an Ethereum account. 
+      // It's used to send transactions to contracts and other accounts.
       const [owner] = await ethers.getSigners();
 
       const BuyMeACoffee = await ethers.getContractFactory("BuyMeACoffee");
@@ -124,5 +143,145 @@ describe("BuyMeACoffee", function () {
       expect(memos[1][2]).eq(name2);
       expect(memos[1][3]).eq(msg2);
     });
+  });
+
+  describe("updateWithdrawalAddress", () => {
+    
+    it("only owner can change withdrawal address", async function () {
+      const [owner, tipper1, tipper2] = await ethers.getSigners();
+
+      const BuyMeACoffee = await ethers.getContractFactory("BuyMeACoffee");
+
+      const buyMeACoffee = await BuyMeACoffee.deploy();
+
+      await expect(
+        buyMeACoffee
+        .connect(tipper1)
+        .updateWithdrawalAddress(tipper1.address)
+      ).to.be.revertedWith("Only contract owner can update withdrawal address");
+    });
+
+    it("intially owner's address is set for withdrawal address", async function () {
+      const [owner, tipper1] = await ethers.getSigners();
+
+      const BuyMeACoffee = await ethers.getContractFactory("BuyMeACoffee");
+
+      const buyMeACoffee = await BuyMeACoffee.deploy();
+
+      const name = "tom";
+      const msg = "message 1";
+
+      const ownerBalanceBefore = await ethers.provider.getBalance(
+        owner.address
+      );
+
+      const ownerBalanceBeforeEth = Web3.utils.fromWei(
+        `${ownerBalanceBefore}`,
+        "ether"
+      );
+
+      await expect(await buyMeACoffee.balanceOf()).eq(0);
+      
+      await expect(
+        buyMeACoffee.connect(tipper1).buyACoffee("tom", "message 1", {
+          value: ethers.utils.parseEther("1.000"),
+        })
+      );
+      await expect(
+        buyMeACoffee.connect(tipper1).buyACoffee("tom2", "message 2", {
+          value: ethers.utils.parseEther("1.000"),
+        })
+      );
+
+      await expect(
+        buyMeACoffee
+          .connect(tipper1)
+          .withdrawTips()
+      )
+
+      await waitForExpect(async () => {
+        const ownerBalanceAfter = await ethers.provider.getBalance(
+          owner.address
+        );
+
+        const ownerBalanceAfterEth = Web3.utils.fromWei(
+                  `${ownerBalanceAfter}`,
+                  "ether"
+                );
+
+        const contractBalanceAfterEth = Web3.utils.fromWei(
+          `${await buyMeACoffee.balanceOf()}`,
+          "ether"
+        );
+
+        await expect(Math.floor(contractBalanceAfterEth)).eq(0);
+        await expect(Math.floor(ownerBalanceAfterEth - ownerBalanceBeforeEth)).eq(2);
+      });
+
+    });
+
+    it("withdrawal address can be updated", async function () {
+      const [owner, tipper1, newWithdrawalAddress] = await ethers.getSigners();
+
+      const BuyMeACoffee = await ethers.getContractFactory("BuyMeACoffee");
+
+      const buyMeACoffee = await BuyMeACoffee.deploy();
+
+      await printBalance('owner', owner.address);
+      await printBalance('tipper1', tipper1.address);
+      await printBalance('newWithdrawalAddress', newWithdrawalAddress.address);
+      await printBalance('contract', buyMeACoffee.address);
+
+      const newWithdrawalAddressBalanceBefore = await ethers.provider.getBalance(
+        newWithdrawalAddress.address
+      );
+
+      const newWithdrawalAddressBalanceBeforeEth = Web3.utils.fromWei(
+        `${newWithdrawalAddressBalanceBefore}`,
+        "ether"
+      );
+
+      await expect(await buyMeACoffee.balanceOf()).eq(0);
+      
+      await expect(
+        buyMeACoffee.connect(tipper1).buyACoffee("tom", "message 1", {
+          value: ethers.utils.parseEther("1.000"),
+        })
+      );
+      await expect(
+        buyMeACoffee.connect(tipper1).buyACoffee("tom2", "message 2", {
+          value: ethers.utils.parseEther("1.000"),
+        })
+      );
+
+      await expect(buyMeACoffee
+        .connect(owner)
+        .updateWithdrawalAddress(newWithdrawalAddress.address));
+
+      await expect(buyMeACoffee
+          .connect(owner)
+          .withdrawTips());
+
+      await waitForExpect(async () => {
+
+        await printBalance('owner', owner.address);
+        await printBalance('tipper1', tipper1.address);
+        await printBalance('newWithdrawalAddress', newWithdrawalAddress.address);
+        await printBalance('contract', buyMeACoffee.address);
+
+      const newWithdrawalAddressBalanceAfter = await ethers.provider.getBalance(
+        newWithdrawalAddress.address
+      );
+
+      const newWithdrawalAddressBalanceAfterEth = Web3.utils.fromWei(
+        `${newWithdrawalAddressBalanceAfter}`,
+        "ether"
+      );
+
+        await expect(Math.floor(newWithdrawalAddressBalanceAfterEth - newWithdrawalAddressBalanceBeforeEth)).eq(2);
+      });
+
+    });
+
   });
 });
